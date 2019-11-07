@@ -65,9 +65,7 @@ ggplot(data = gss_sm, mapping = aes(x = religion, color = religion)) + geom_bar(
 # guides(fill = F) disables the legend for the fill aesthetic 
 ggplot(data = gss_sm, mapping = aes(x = religion, fill = religion)) + geom_bar() + guides(fill = F)
 
-
 ggplot(data = gss_sm, mapping = aes(x = bigregion, fill = religion)) + geom_bar(position = "fill")
-
 
 
 # The secrets of histograms:
@@ -80,7 +78,4 @@ ggplot(data = midwest, mapping = aes(x = percollege, y = percadultpoverty)) + ge
 
 ggplot(data = midwest, mapping = aes(x = percollege, y = percadultpoverty)) + geom_density_2d() + geom_point(alpha = 0.5) + 
   coord_cartesian(xlim = c(5, 30))
-
-
-
 
