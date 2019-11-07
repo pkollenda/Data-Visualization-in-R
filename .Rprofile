@@ -21,3 +21,5 @@ cat("Some tips for GIT: \n
 
 options(scipen = 12)
 options(warnPartialMatchArgs = TRUE)
+
+
