@@ -82,17 +82,17 @@ plot(lnd, col = "lightgrey")
 plot(lnd[lnd$Partic_Per < 15, ], col = "red", add  = T)
 plot(lnd[lnd$Partic_Per > 25, ], col = "green", add  = T)
 
-# Plot all the districts that are within 10km of the city centre.
+# Step 2: Plot all the districts that are within 10km of the city centre.
 plot(lnd, col = "lightgrey") # Raw graph with all of the map.
 centre_london <- gCentroid(lnd[lnd$name == "City of London",]) # Coordinates for the centre of london.
 
-# Use GBuffer function to, starting with a given location, extend its coordinates according to a certain width.
+# . Use GBuffer function to, starting with a given location, extend its coordinates according to a certain width.
 lnd_buffer <- gBuffer(spgeom = centre_london, width = 10000)
 
-# Subset all locations within the buffer, i.e. whose centroid is within the lnd_buffer object.
+# . Subset all locations within the buffer, i.e. whose centroid is within the lnd_buffer object.
 lnd_include <- lnd[lnd_buffer,]
-plot(centre_london, col = "lightblue", add = T)
-plot(lnd_buffer, col = "red", add = T)
+plot(centre_london, lwd = 2, col = "red", add = T)
+plot(lnd_buffer, border = "blue", add = T)
 
 # method 1 of subsetting selects any intersecting zones
 lnd_central <- lnd[lnd_buffer,] # the selection is too big!
@@ -130,7 +130,7 @@ lnd$quadrant[!east & !north] <- "South-West"
 plot(lnd)
 plot(lnd[lnd$quadrant == "North-East",], col = "yellow", add = T)
 plot(lnd[lnd$quadrant == "South-East",], col = "red", add = T)
-plot(lnd[lnd$quadrant == "North-East",], col = "yellow", add = T)
-plot(lnd[lnd$quadrant == "North-East",], col = "yellow", add = T)
+plot(lnd[lnd$quadrant == "North-West",], col = "blue", add = T)
+plot(lnd[lnd$quadrant == "South-West",], col = "green", add = T)
 
 
