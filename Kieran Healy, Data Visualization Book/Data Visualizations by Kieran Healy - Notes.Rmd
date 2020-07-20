@@ -48,7 +48,7 @@ p + geom_point(alpha = 0.3) +
 The **color** aesthetic affects the appearance of lines and points, the **fill** aesthetic
 controls the appearance of the filled areas of bars, polygons or, in this case,
 the interior of the smoothers's standard error ribbons.
-```{r fig.height=9, fig.width=12, message=FALSE, warning=FALSE}
+```{r, fig.height=9, fig.width=12, message=FALSE, warning=FALSE}
 ## Note that within the curly brackets we can set options to be different from the default.
 p <- ggplot(data = gapminder, mapping = aes(x = gdpPercap, y = lifeExp, 
     color = continent, fill = continent))
@@ -71,9 +71,104 @@ ggsave(filename = here("Kieran Healy, Data Visualization Book", "figures", "gdp_
 
 ## Show the Right Numbers
 
-```{r}
+Use `facet_wrap()` to split data by group and create separate mini-plots for each group.
+
+```{r, facets, message = F, warning = F}
+p <- ggplot(data = gapminder, aes(x = year, y = gdpPercap))
+p + geom_line(color = "gray70", aes(group = country)) +
+    geom_smooth(size = 1.1, method = "loess", se = FALSE) + 
+    scale_y_log10(labels = scales::dollar) + 
+    facet_wrap(facets = vars(continent), ncol = 5) +
+    labs(x = "Year", y = "GDP per capita", 
+         title = "GDP per capita on Five Continents")
+```
+Alternatively, you can use `facet_grid()` to split groups into sub-plots with more
+control, along a true 2-dimensional grid. To illustrate, we use data from the `gss_sm`
+dataset which contains questions from the 2016 General Social Survey.
+
+```{r, gss_data}
+p <- ggplot(data = gss_sm, aes(x = age, y = childs))
+p + geom_point(alpha = 0.2) +
+    geom_smooth() +
+    facet_grid(rows = vars(sex), cols = vars(race))
 
 ```
+
+### stat_* functions and their relation to geom's
+Every `geom_*` function has an asscociated `stat_*` function that it uses by default.
+The reverse is also true, every `stat_*` function has an associated `geom_*` function
+that it will plot by default. For example, the `geom_bar()` function automatically
+calls the `stat_count()` function which calculates the values for the count and the 
+proportion. We can then call these values in the mapping through `y = ..prop..`.
+
+```{r, stat}
+p <- ggplot(data = gss_sm, mapping = aes(x = bigregion))
+## Note that we need to add group = 1 to tell R to ignore the grouping by the x-variable
+## when calculating the proportions.
+p + geom_bar(aes(y = ..prop.., group = 1))
+
+## If we want to additionally color the bars according to their category we use the
+## fill aesthetic (the color aesthetic would only create a colored border).
+## Note that the reader needs no legend, because the categories are already encoded
+## in the x axis. We can turn of guidance for an aesthetic with the guides() function.
+p + geom_bar(aes(fill = bigregion)) +
+    guides(fill = FALSE)
+
+## Let's display what the proportion of each religion within each state is.
+## Of all people in the Northeast, what proportion are Catholic, etc... We can do 
+## this two ways, by using the same bar diagram and positioning the different religions
+## side-by-side...
+p <- ggplot(data = gss_sm, mapping = aes(x = religion, fill = bigregion))
+p + geom_bar(position = "dodge", mapping = aes(y = ..prop.., group = bigregion))
+
+## While this works, it makes it unintuitive to compare bars across different groups.
+## It is also not clear immediately which group (religion or region) sum up to 1.
+## In this case, it is probably easier to let the bar's divide by religion and facet
+## by region. We then do not need the fill aesthetic.
+
+p <- ggplot(data = gss_sm, mapping = aes(x = religion))
+p + geom_bar(mapping = aes(y = ..prop.., group = bigregion)) + facet_wrap(vars(bigregion))
+```
+
+### The identity stat and position
+You can call `stat = "identity` to say that ggplot should perform no calculation
+on the data. This is helpful to display data as is without geom_*'s performing their
+default calculations of summary statistics.
+
+```{r}
+
+p <- ggplot(data = titanic, aes(x = fate, y = percent, fill = sex))
+p + geom_bar(position = "dodge", stat = "identity")
+
+## An alternative is the geom_col() function which is the same as geom_bar with the
+## default stat = "identity".
+# p + geom_col(position = "dodge")
+```
+Similarly, one can set the position argument to `position = "identity"` to tell
+ggplot to display the data *exactly where it is*. This can be used (with ordered data)
+to use bar plots as alternatives to line plots.
+
+```{r}
+
+p <- ggplot(data = oecd_sum, aes(x = year, y = diff, fill = hi_lo))
+p + geom_col() +
+    guides(fill = FALSE) +
+    labs(x = NULL, y = "Difference in Years", 
+         title = "The US Life Expectancy Gap",
+         subtitle = "Difference between US and OECD average life expectancies, 1960-2015",
+         caption = "Data: OECD. After a chart by Christopher Ingraham, Washington Post, December 27th 2017.")
+
+```
+### Exploring alternatives to the histogram
+
+```{r}
+
+p <- ggplot(data = gapminder, aes(x = gdpPercap))
+p + geom_bin2d(aes(y = lifeExp), bins = c(25, 20)) +
+    scale_x_log10(labels = scales::dollar)
+
+```
+
 
 
 ## Graph Tables, Make Labels, Add Notes
