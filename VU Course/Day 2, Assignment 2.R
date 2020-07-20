@@ -40,6 +40,7 @@ out_mrg <- gss_wt %>% filter(year %in% seq(1976, 2016, by = 4)) %>%
 # Preparation for Figures
 out_grp <- out_grp %>% filter(race %in% c("White", "Black")) %>% 
   filter(!is.na(degree))
+saveRDS(out_grp, "survey_data")
 
 p_main <- ggplot(data = out_grp, aes(y = prop, group = race, color = race, fill = race)) + 
   scale_y_continuous(labels = scales::percent) + 
@@ -51,7 +52,7 @@ p_main <- ggplot(data = out_grp, aes(y = prop, group = race, color = race, fill 
 
 # Figure 1
 p_main + 
-  geom_col(aes(x = degree), position = position_dodge(), alpha = 0.2) + 
+  geom_col(aes(x = degree), position = position_dodge(width = 0.9), alpha = 0.2) + 
   geom_errorbar(aes(x = degree, ymin = prop - 1.96 * prop_se, ymax = prop + 1.96 * prop_se), width = 0.2, position = position_dodge(width = 0.9)) +
   facet_wrap(vars(year), ncol = 2)
   
@@ -62,6 +63,11 @@ p_main +
               alpha = 0.2, linetype = 0) + 
   facet_wrap(vars(degree), ncol = 1)
 
+
+# Additional Questions
+econ <- economics %>% mutate(unemploy_rate = unemploy/pop, event = as.Date(date) < "2008-10-01")
+ggplot(data = econ, mapping = aes(x = date, y = unemploy_rate)) + geom_line() +
+  scale_x_date(date_breaks = "5 years")
 
 # --- Question 2: GIS, Mapping Data  ---------------------------------------------------------------
 # Libraries
