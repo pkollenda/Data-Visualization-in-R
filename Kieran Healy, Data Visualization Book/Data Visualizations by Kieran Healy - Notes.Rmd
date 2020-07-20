@@ -1,0 +1,104 @@
+---
+title: "Data Visualizations - A Practical Introduction by Kieran Healy"
+author: "Philipp Kollenda"
+date: "2019-01-02"
+output: html_document
+---
+   
+## Data Visualization Notes
+
+```{r setup, include=FALSE}
+
+## The include=FALSE option tells R to run, but not display the 
+## code in this chunk.
+## By defult, show code for all chunks in the knitted document,
+## as well as the output. To override for a particular chunk
+## use echo = FALSE in its options.
+knitr::opts_chunk$set(echo = TRUE) 
+
+## Set the default size of figures
+knitr::opts_chunk$set(fig.width=8, fig.height=5)  
+
+## Load the libraries we will be using
+library(gapminder)
+library(here)
+library(socviz)
+library(tidyverse)
+
+```
+
+## Make a Plot
+
+```{r, message=FALSE, warning=FALSE}
+## General strategy: First define the object for ggplot and assign it a name.
+## Then add geom_*'s etc. additively and display immediately.
+p <- ggplot(data = gapminder, mapping = aes(x = gdpPercap, y = lifeExp))
+
+## A first version of a relatively polished plot
+p + geom_point(alpha = 0.3) + 
+    geom_smooth(method = "lm") + 
+    scale_x_log10(labels = scales::dollar) + 
+    labs(x = "GDP Per Capita", y = "Life Expectancy in Years", 
+         title = "Economic Growth and Life Expectancy",
+         subtitle = "Data points are country-years",
+         caption = "Source: Gapminder")
+
+```
+
+The **color** aesthetic affects the appearance of lines and points, the **fill** aesthetic
+controls the appearance of the filled areas of bars, polygons or, in this case,
+the interior of the smoothers's standard error ribbons.
+```{r fig.height=9, fig.width=12, message=FALSE, warning=FALSE}
+## Note that within the curly brackets we can set options to be different from the default.
+p <- ggplot(data = gapminder, mapping = aes(x = gdpPercap, y = lifeExp, 
+    color = continent, fill = continent))
+
+p_out <- 
+  p + geom_point(alpha = 0.3) + 
+    geom_smooth(method = "lm") + 
+    scale_x_log10(labels = scales::dollar) + 
+    labs(x = "GDP Per Capita", y = "Life Expectancy in Years", 
+         title = "Economic Growth and Life Expectancy",
+         subtitle = "Data points are country-years",
+         caption = "Source: Gapminder")
+
+## Save via ggsave and, if the plot is assigned a name, specify plot = ...
+## Vector based graphs (.pdf / .svg) are easier to resize, but larger than raster based graphs (.png / .jpg)
+ggsave(filename = here("Kieran Healy, Data Visualization Book", "figures", "gdp_lifeexp_chapter3.pdf"), plot = p_out, 
+       height = 9, width = 16, units = "in")
+```
+
+
+## Show the Right Numbers
+
+```{r}
+
+```
+
+
+## Graph Tables, Make Labels, Add Notes
+
+```{r}
+
+```
+
+## Work with Models
+
+```{r}
+
+```
+
+## Draw Maps
+
+```{r}
+
+```
+
+
+## Refine your Plots
+
+```{r}
+
+```
+
+
