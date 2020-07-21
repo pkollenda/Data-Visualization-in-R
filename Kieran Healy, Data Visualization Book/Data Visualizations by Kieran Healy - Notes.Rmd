@@ -2,7 +2,9 @@
 title: "Data Visualizations - A Practical Introduction by Kieran Healy"
 author: "Philipp Kollenda"
 date: "2019-01-02"
-output: html_document
+output: 
+  html_document:
+    toc: true
 ---
    
 ## Data Visualization Notes
@@ -175,7 +177,201 @@ p + geom_bin2d(aes(y = lifeExp), bins = c(25, 20)) +
 
 ```{r}
 
+rel_by_region <- gss_sm %>% group_by(bigregion, religion) %>% 
+  summarise(N = n()) %>% mutate(freq = N / sum(N), pct = round((freq*100), 0))
+
+## As a rule, dodged charts can be more cleanly expressed as faceted plots and 
+## to prevent long and overlapping labels, coord_flip() is the way to go.
+p <- ggplot(data = rel_by_region, mapping = aes(x = religion, y = pct, fill = religion))
+p + geom_col(position = "dodge2") +
+    labs(x = NULL, y = "Percent", fill = "Religion") +
+    guides(fill = FALSE) +
+    coord_flip() +
+    facet_grid(cols = vars(bigregion))
+
 ```
+
+Boxplots are a good way of displaying variation within groups, separately for different
+groups. Just like `stat_bar()`, `geom_boxplot()` and its connected `stat_boxplot()` 
+calculate summary statistics to display the median, quantiles and outliers.
+
+```{r}
+
+## By default, geom_boxplot orders values on the x-Axis alphabetically, but this is
+## usually not the most sensible order. Better to order good on top to bad on bottom.
+## You can reorder() by mean (default), median, sd. Here median (consistent with black line in
+## boxplot) or mean (consistent with center of mass of box of boxplot) are good.
+p <- ggplot(data = organdata, mapping = aes(x = reorder(country, donors, na.rm = T), 
+                                            y = donors, fill = world))
+p + geom_boxplot() +
+    labs(x = NULL) +
+    coord_flip() +
+    theme(legend.position = "top")
+
+## If there are relatively few observations per group (here country), it is desirable
+## to (also) show the raw data with geom_point(). Use jitter to perturb points and 
+## avoid overplotting.
+p + geom_jitter(aes(fill = NULL, color = world), position = position_jitter(width = 0.15)) +
+    labs(x = NULL) +
+    coord_flip() +
+    theme(legend.position = "top")
+
+```
+
+### Cleveland dotplots. The better bar- or boxplot.
+If you are displaying only one point per category (or a summary statistic) it is
+often more appearling to use a Cleveland dotplot over a bar plot or a dot-and-whisker
+plot over a boxplot. To do this, you first transform the dataset and create the mean
+and standard deviation manually and then only plot the mean (as dots) and the standard
+deviation (as whiskers).
+
+```{r}
+
+## Note that summarise changed compared to the version in the book. Now scoping
+## over variables is done via multiple across() calls.
+## The .names below is the default, but would allow for more flexibility. Functions
+## are passed as named list.
+by_country <- organdata %>% group_by(consent_law, country) %>% 
+  summarise(across(is.numeric, list(mean = mean, sd = sd), na.rm = T, .names = "{col}_{fn}"), 
+            across(world, first)) %>% 
+  ungroup()
+
+p <- ggplot(by_country, aes(x = donors_mean, y = reorder(country, donors_mean), color = consent_law))
+p + geom_point(size = 3) +
+    labs(x = "Donor procurement rate", y = NULL, color = "Consent Law") + 
+    theme(legend.position = "top")
+
+# Add whiskers to show the standard deviation with the geom_pointrange geom. Since
+p + geom_point(size = 3) + 
+    geom_pointrange(aes(xmin = donors_mean - donors_sd, xmax = donors_mean + donors_sd)) +
+    labs(x = "Donor procurement rate", y = NULL, color = "Consent Law") +
+    theme(legend.position = "top")
+
+## Instead of color coding the type of consent law, it might be better to facet the plot.
+## In that case, keep the y axis free floating to not duplicate country rows.
+p <- ggplot(by_country, aes(x = donors_mean, y = reorder(country, donors_mean)))
+p + geom_point(size = 3) +
+    facet_wrap(vars(consent_law), scale = "free_y", ncol = 1) +
+    labs(x = "Donor procurement rate", y = NULL) 
+
+```
+
+### Adding text to plots.
+
+```{r, fig.width = 15, fig.height = 15}
+
+## The ggrepel package and its geom_text_repel() function performs better than the
+## geom_text() function and does not overlay labels. 
+
+library(ggrepel)
+
+p <- ggplot(elections_historic, aes(x = popular_pct, y = ec_pct, label = winner_label))
+p + geom_vline(xintercept = 0.5, size = 1.4, color = "grey80") +
+    geom_hline(yintercept = 0.5, size = 1.4, color = "grey80") +
+    geom_point() +
+    geom_text_repel() +
+    scale_x_continuous(labels = scales::percent) +
+    scale_y_continuous(labels = scales::percent) +
+    labs(title = "Presidential elections: Popular & electoral college margins",
+         subtitle = "1824-2016",
+         caption = "Data for 2016 is provisional.",
+         x = "Winner's share of popular vote", 
+         y = "Winner's share of electoral college votes",
+         label = NULL) 
+```
+
+```{r}
+
+## Usually, we would want to display labels only for certain points.
+
+p <- ggplot(data = by_country, aes(x = gdp_mean, y = health_mean))
+p + geom_point() +
+    geom_text_repel(data = subset(by_country, gdp_mean > 25000), 
+                    aes(label = country))
+
+organdata$ind <- organdata$ccode %in% c("Ita", "Spa") & organdata$year > 1998
+p <- ggplot(organdata, aes(x = roads, y = donors))
+p + geom_point(aes(color = ind)) +
+    geom_text_repel(data = subset(organdata, ind), mapping = aes(label = ccode)) +
+    guides(color = FALSE, label = FALSE)
+
+## It looks nice to fade unlabelled points with alpha. Can be done in aesthetic, but
+## maybe more robust to do it in geom_point(). geom_text_repel can create labels 
+## based on a combination of values from various columns which is cool!
+p + geom_point(data = subset(organdata, ind), alpha = 1) +
+    geom_point(data = subset(organdata, !ind), alpha = 0.2) +
+    geom_text_repel(data = subset(organdata, ind), mapping = aes(label = paste(ccode, lubridate::year(year), sep = " "))) +
+    guides(label = FALSE) +
+    labs(caption = "Spain and Italy after 1998 are highlighted, other countries are faded out.")
+
+```
+In the previous examples we added labels to the graph, were the labels had to be 
+(a combination of) existing values in the dataset, like country-year pairs. Instead
+we can add commentary to a plot by annotating it manually. `annotate()` simply tells
+R to add **something** to the plot. We specify what should be added with the `geom = ...`
+option. 
+
+```{r}
+
+p <- ggplot(organdata, aes(x = roads, y = donors))
+p + geom_point() + 
+    annotate(geom = "text", label = "A surprisingly high \n recovery rate.",
+             x = 157, y = 33, hjust = 0) +
+    annotate(geom = "rect", fill = "red", alpha = 0.2,
+             xmin = 125, xmax = 155, ymin = 30, ymax = 35) + 
+    annotate(geom = "curve", x = 175, y = 31.5, xend = 154, yend = 30, curvature = -0.5, color = "red", alpha = 0.7, arrow = arrow(length = unit(0.5, "cm")))
+
+
+```
+### Exercises
+
+```{r}
+
+elections_historic <- elections_historic %>% filter(win_party %in% c("Dem.", "Rep.")) %>% 
+  mutate(ind = year > 1980)
+party_colors <- c("#2E74C0", "#CB454A")
+
+p <- ggplot(data = elections_historic, aes(x = popular_pct, y = ec_pct, color = win_party))
+p + geom_vline(xintercept = 0.5, size = 1.4, color = "grey80") +
+    geom_hline(yintercept = 0.5, size = 1.4, color = "grey80") +
+    geom_point(data = subset(elections_historic, !ind), alpha = 0.4) +
+    geom_point(data = subset(elections_historic, ind)) +
+    geom_text_repel(data = subset(elections_historic, ind), aes(label = winner_label)) +
+    scale_x_continuous(labels = scales::percent) +
+    scale_y_continuous(labels = scales::percent) +
+    scale_color_manual(labels = c("Democrat", "Republican"), values = party_colors) +
+    guides(label = F) +
+    labs(title = "Presidential elections: Popular & electoral college margins",
+         subtitle = "1824-2016",
+         caption = "Data for 2016 is provisional.",
+         x = "Winner's share of popular vote", 
+         y = "Winner's share of electoral college votes",
+         color = "",
+         label = NULL) +
+    theme(legend.position = "top")
+
+```
+
+```{r}
+
+party_colors <- c("#2E74C0", "#CB454A")
+
+p <- ggplot(subset(elections_historic, year > 1940), aes(x = popular_pct, y = reorder(winner_label, popular_pct), color = win_party))
+p + geom_vline(xintercept = 0.5) + 
+    geom_point() +
+    guides(color = F) +
+    scale_x_continuous(labels = scales::percent) +    
+    scale_color_manual(values = party_colors) +
+    labs(x = "Winner's share popular vote", y = NULL) +    
+    guides(color = FALSE) +
+    annotate(geom = "curve", xend = 0.508, yend = 8.75, x = 0.53, y = 7, 
+             arrow = arrow(length = unit(0.5, "cm")), curvature = -0.3) +
+    annotate(geom = "text", label = "In 2004, George Bush won Florida \n only after a controversial decision \n of the Supreme Court.",
+             x = 0.53, y = 7, hjust = 0)
+
+
+```
+
 
 ## Work with Models
 
