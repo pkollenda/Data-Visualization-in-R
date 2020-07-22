@@ -375,9 +375,146 @@ p + geom_vline(xintercept = 0.5) +
 
 ## Work with Models
 
+Get to know the `broom` Package. `tidy()` extracts estimates, standard errors and
+confidence intervals. We can change the labels by editing the $term argument.
+
 ```{r}
 
+out <- lm(lifeExp ~ gdpPercap + pop + continent, data = gapminder)
+out_conf <- tidy(out, conf.int = T) %>% round_df
+out_conf <- subset(out_conf, !term %in% c("(Intercept)"))
+out_conf$nicelabs <- str_replace(out_conf$term, "continent", "")
+
+p <- ggplot(out_conf, aes(x = reorder(nicelabs, estimate), y = estimate,
+                          ymin = conf.low, ymax = conf.high))
+p + geom_pointrange() +
+    coord_flip() +
+    labs(x = "", y = "OLS Estimate")
 ```
+The broom package is powerful in combination with `group_by()` and `nest()` to 
+create model fits separately for different groups.
+
+```{r}
+
+fit_ols <- function(df) {
+  lm(lifeExp ~ log(gdpPercap), data = df)
+}
+
+out_le <- gapminder %>% 
+  group_by(continent, year) %>% 
+  nest() %>% 
+  mutate(model = map(data, fit_ols),
+         tidied = map(model, tidy, conf.int = T)) %>% 
+  unnest(tidied, .drop = T) %>% 
+  filter(term != "(Intercept)" & continent != "Oceania")
+
+p <- ggplot(out_le, aes(x = year, group = continent, color = continent,
+                        y = estimate, ymin = conf.low, ymax = conf.high))
+p + geom_pointrange(position = position_dodge(width = 1)) +
+    scale_x_continuous(breaks = unique(gapminder$year)) +
+    labs(x = "", y = "OLS Estimate, log(GDP per Capita)", color = "Continent") +
+    theme(legend.position = "top")
+    
+
+```
+
+Not all regression estimates translate as straightforward to marginal effects as
+regular OLS regressions. For example, for logistic regression (`glm(formula, family = "binomial", ...)`)
+we can use the `margins()` package.
+
+```{r}
+
+library(margins)
+
+## Use relevel to define a factor level as the default.
+gss_sm$polviews_m <- relevel(gss_sm$polviews, ref = "Moderate")
+
+## Use glm(family = "binomial") for logistic. sex*race creates interaction effects.
+out_bo <- glm(obama ~ polviews_m + sex*race, family = "binomial", data = gss_sm)
+
+bo_gg <- as_tibble(summary(margins(out_bo)))
+bo_gg$factor <- str_remove(bo_gg$factor, "polviews_m|sex")
+bo_gg$factor <- str_replace(bo_gg$factor, "race", "Race: ")
+
+p <- ggplot(data = bo_gg, aes(x = reorder(factor, AME),
+                              y = AME, ymin = lower, ymax = upper))
+p + geom_pointrange() +
+    geom_hline(yintercept = 0, color = "gray80") +
+    labs(x = "", y = "Average Marginal Effect") +
+    coord_flip()
+
+## It is also nice to plot coniditonal marginal effect:
+pv_cp <- cplot(out_bo, x = "sex", draw = F)
+
+p <- ggplot(data = pv_cp, aes(x = reorder(xvals, yvals), y = yvals, ymin = lower, ymax = upper))
+p + geom_pointrange() +
+    geom_hline(yintercept = 0, color = "gray80") +
+    labs(x = "", y = "Conditional effect") +
+    coord_flip()
+
+```
+
+Let us now look at survey data explicitly.
+```{r}
+
+library(survey)
+library(srvyr)
+options(survey.lonely.psu = "adjust")
+options(na.action = "na.pass")
+
+gss_wt <- subset(gss_lon, year > 1974) %>% 
+  mutate(stratvar = interaction(year, vstrat)) %>% 
+  as_survey_design(ids = vpsu,
+                   strata = stratvar,
+                   weights = wtssall,
+                   nest = TRUE)
+
+out_mrp <- gss_wt %>% 
+  filter(year %in% seq(1976, 2016, by = 4)) %>% 
+  mutate(racedeg = interaction(race, degree)) %>% 
+  group_by(year, racedeg) %>% 
+  summarize(prop = survey_mean(na.rm = T)) %>% 
+  separate(racedeg, into = c("race", "degree"), sep = "\\.")
+
+out_grp <- gss_wt %>% 
+  filter(year %in% seq(1976, 2016, by = 4)) %>% 
+  group_by(year, race, degree) %>% 
+  summarize(prop = survey_mean(na.rm = T))
+
+p <- ggplot(data = subset(out_grp, race != "Other"), 
+            mapping = aes(x = degree, color = race, fill = race, group = race, 
+                          y = prop, ymin = prop-2*prop_se, ymax = prop+2*prop_se))
+p + geom_col(position = position_dodge(width = 0.9), alpha = 0.2) +
+    geom_errorbar(position = position_dodge(width = 0.9), width = 0.2) +
+    scale_x_discrete(labels = scales::wrap_format(10)) +
+    scale_y_continuous(labels = scales::percent) +
+    scale_color_brewer(type = "qual", palette = "Dark2") +
+    scale_fill_brewer(type = "qual", palette = "Dark2") +
+    labs(title = "Educational Attainment by Race", 
+         subtitle = "GSS 1976-2016",
+         fill = "Race", color = "Race",
+         x = "", y = "") +
+    facet_wrap(vars(year), ncol = 2) +
+    theme(legend.position = "top")
+
+## Alternatively, we can use a line plot to better show time trends.
+p <- ggplot(subset(out_grp, race != "Other"), aes(x = year, color = race, fill = race, group = race,
+                         y = prop, ymin = prop-2*prop_se, ymax = prop+2*prop_se))
+p + geom_ribbon(alpha = 0.3, aes(color = NULL)) +
+    geom_line() +
+    facet_wrap(vars(degree), ncol = 1) +
+    scale_y_continuous(labels = scales::percent) +
+    scale_color_brewer(type = "qual", palette = "Dark2") +
+    scale_fill_brewer(type = "qual", palette = "Dark2") +
+    labs(title = "Educational Attainment by Race", 
+         subtitle = "GSS 1976-2016",
+         fill = "Race", color = "Race",
+         x = NULL, y = "") +
+    theme(legend.position = "top")
+
+```
+
+
 
 ## Draw Maps
 
